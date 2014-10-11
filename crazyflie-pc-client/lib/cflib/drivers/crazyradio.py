@@ -25,6 +25,8 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA  02110-1301, USA.
+#removed third argument 0 for both read and write. similar to an issue in https://bitbucket.org/benallard/galileo/issue/77/typeerror-write-takes-at-most-4-arguments#comment-10892785 in line 245,6
+# lib/cflib/drivers/crazyradio.py
 
 """
 USB driver for the Crazyradio USB dongle.
@@ -239,8 +241,8 @@ class Crazyradio:
                 self.handle.bulkWrite(1, dataOut, 1000)
                 data = self.handle.bulkRead(0x81, 64, 1000)
             else:
-                self.handle.write(1, dataOut, 0, 1000)
-                data = self.handle.read(0x81, 64, 0, 1000)
+                self.handle.write(1, dataOut, 1000)
+                data = self.handle.read(0x81, 64, 1000) #removed third argument 0 for both read and write. similar to an issue in https://bitbucket.org/benallard/galileo/issue/77/typeerror-write-takes-at-most-4-arguments#comment-10892785
         except usb.USBError:
             pass
 

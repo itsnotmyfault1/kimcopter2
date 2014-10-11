@@ -1,0 +1,98 @@
+don't forget to install everything it tells you to, and also git and mercurial.
+The permissions are annoying too. gotta chmod +x a few things.What do I want: I want to find where the 
+button mapping for the gui is
+
+First: change the log groups in crazyflie-firmware/modules/src/stabilizer.c:
+declare the variables,
+add a new log group called drift
+initialize the drifting in the set_hover group
+in 250hz refresh, you also refresh the drift variables.
+
+Second: Fix the bug in /crazyflie-pc-client/lib/cflib/drivers/crazyradio.py line 245, 246
+#removed third argument 0 for both read and write. similar to an issue in https://bitbucket.org/benallard/galileo/issue/77/typeerror-write-takes-at-most-4-arguments#comment-10892785
+
+
+
+and where the PID controller is
+modules\scr\stabilizer.c
+ |  + controller.c
+ |  + imu6Read(&gyro, &acc);
+ |  + this is in the hal/imu.c
+ |  + 
+ |  + 
+ 
+ 
+ move in _ direction for _ meters:
+ assume "hover" mode-which is using barometer and first integral of z-acceleration
+ I need functions that can track x,y,z motion, that I know how to use.
+ 
+ how do the LOG_GROUP s work?
+
+/kimcopter/crazyflie-pc-client/build/lib.linux-x86_64-2.7/cflib/drivers/crazyradio.py or
+/crazyflie-pc-client/lib/cflib/drivers/crazyradio.py line 245, 246
+
+#removed third argument 0 for both read and write. similar to an issue in https://bitbucket.org/benallard/galileo/issue/77/typeerror-write-takes-at-most-4-arguments#comment-10892785
+
+itsnotmyfault@itsnotmyfault-VirtualBox:~/kimcopter$ sudo grep -r PS3_
+crazyflie-firmware/README.md:* Set up your hover button from the GUI. By default for PS3_Mode_1 its the L1 button of the PS3 controller.
+crazyflie-pc-client/README.md:* Set up your hover button from the GUI. By default for PS3_Mode_1 its the L1 button of the PS3 controller.
+Binary file crazyflie-pc-client/.hg/undo.dirstate matches
+Binary file crazyflie-pc-client/.hg/dirstate matches
+crazyflie-pc-client/.hg/store/fncache:data/lib/cfclient/configs/input/PS3_Mode_2.json.i
+crazyflie-pc-client/.hg/store/fncache:data/lib/cfclient/configs/input/PS3_Mode_1.json.i
+crazyflie-pc-client/.hg/store/fncache:data/cfclient/configs/input/PS3_Mode_2.json.i
+crazyflie-pc-client/.hg/store/fncache:data/lib/cfclient/configs/input/PS3_Mode_3.json.i
+crazyflie-pc-client/.hg/store/fncache:data/cfclient/configs/input/PS3_Mode_1.json.i
+crazyflie-pc-client/lib/cfheadless.py:                        type=str, default="PS3_Mode_1",
+crazyflie-pc-client/lib/cfheadless.py:                             "defaults to PS3_Mode_1")
+crazyflie-pc-client/lib/cfclient/configs/input/PS3_Mode_3.json:      "name": "PS3_Mode_3", 
+Binary file .git/index matches
+
+to get data out of the LOG_GROUP structs, 
+/crazyflie-pc-client/lib/cflib/crazyflie/log.py
+should only require the name of the variable to get the meaningful data out of it.
+lib/cfclient/ui/tabs/FlightTab.py:        self.actualM4.setValue(data["motor.m4"])
+lib/cfclient/ui/tabs/FlightTab.py:        lg.addVariable(LogVariable("motor.m4", "uint32_t"))
+lib/cflib/cache/892049D2.json:    "m4": {
+lib/cflib/cache/892049D2.json:      "name": "m4", 
+lib/cflib/crtp/debugdriver.py:                                "varname": "m4", "min": 0, "max": 65000,
+
+
+new branch
+change pc-client so that face buttons change drift amounts
+	rename the gui
+	instead of sending the variables for roll, pitch, yaw, send NEW variables for drift distances
+change pid controller to control for x,y as well. might be in the stabilizer.c
+	only drift when in hover
+	always drift towards 0
+
+when pc-client tells you to drift by dx or dy, you add the opposite to the pid controller, and you'll slide into position.
+rollNeg and pitchNeg
+
+alternative solution.
+if roll desired == 1.00, 2.00, etc, slide 1 m, 2 m, etc.
+	to do a slide, in stabilizer.ci did a
+
+i can set 
+
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/cfclient/ui/tabs/FlightTab.py", line 204, in _drift_data_received
+    xDriftBox = data["xPos"]
+KeyError: 'xPos'
+
+if I comment that out, it'll complain about 
+WARNING:cfclient.utils.input:Exception while reading inputdevice: Traceback (most recent call last):
+  File "/usr/local/lib/python2.7/dist-packages/cfclient/utils/input.py", line 208, in readInput
+    xPos           = data["xPos"]
+KeyError: 'xPos'
+
+
+which points to the lack of having something in my pygamereader to tell me that xPos is a button?
+lib/cfclient/utils/pygamereader.py:        self.data = {"roll":0.0, "pitch":0.0, "yaw":0.0, "thrust":0.0, "pitchcal":0.0, "rollcal":0.0, "estop": False, "exit":False, "hover":False}
+lib/cfclient/utils/pygamereader.py:                    if (key == "estop"):
+lib/cfclient/utils/pygamereader.py:                        self.data["estop"] = not self.data["estop"]
+
+could be
+lib/cfclient/utils/input.py~:        self.inputdevice = PyGameReader()
+

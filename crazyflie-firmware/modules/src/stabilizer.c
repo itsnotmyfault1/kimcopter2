@@ -21,7 +21,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
- *
+ * /modules/src/stabilizer.c
+ *add a log group for x,yPosition only. Ignore velocity. Who needs a PID
+ * when OBVIOUSLY P-controller is just as good.
  */
 #include "stm32f10x_conf.h"
 #include "FreeRTOS.h"
@@ -104,6 +106,18 @@ PRIVATE float vSpeedAcc = 0.0;
 PRIVATE float vSpeed    = 0.0; // Vertical speed (world frame) integrated from vertical acceleration
 PRIVATE float hoverPIDVal;                    // Output of the PID controller
 PRIVATE float hoverErr;                       // Different between target and current altitude
+
+// Drift variables -Jeffrey DeLucca
+bool drift = false;
+bool set_drift = false;
+PRIVATE float xSpeed                 = 0.0;
+PRIVATE float ySpeed                 = 0.0;
+PRIVATE float xPos                   = 0.0;
+PRIVATE float yPos                   = 0.0;
+PRIVATE float xIntegral              = 0.0;
+PRIVATE float yIntegral              = 0.0;
+PRIVATE float xAccDeadband           = 0.03;  // X acceleration deadband
+PRIVATE float yAccDeadband           = 0.03;  // Y acceleration deadband
 
 // Hover & Baro Params
 PRIVATE float hoverKp                = 0.5;  // PID gain constants, used everytime we reinitialise the PID controller
@@ -200,6 +214,18 @@ LOG_ADD(LOG_FLOAT, vSpeedASL, &vSpeedASL)
 LOG_ADD(LOG_FLOAT, vSpeedAcc, &vSpeedAcc)
 LOG_GROUP_STOP(hover)
 
+// Drift variables -Jeffrey DeLucca- do you need err and target for drift?
+LOG_GROUP_START(drift)
+LOG_ADD(LOG_FLOAT, xPos, &xPos)
+LOG_ADD(LOG_FLOAT, yPos, &yPos)
+LOG_ADD(LOG_FLOAT, xSpeed, &xSpeed)
+LOG_ADD(LOG_FLOAT, ySpeed, &ySpeed)
+LOG_ADD(LOG_FLOAT, xIntegral, &xIntegral)
+LOG_ADD(LOG_FLOAT, yIntegral, &yIntegral)
+//LOG_ADD(LOG_FLOAT, xAccDeadband, &xAccDeadband)
+//LOG_ADD(LOG_FLOAT, yAccDeadband, &yAccDeadband)
+LOG_GROUP_STOP(drift)
+
 //// Params for hovering
 PARAM_GROUP_START(hover)
 PARAM_ADD(PARAM_FLOAT, aslAlpha, &aslAlpha)
@@ -287,6 +313,7 @@ static void stabilizerTask(void* param)
     if (imu6IsCalibrated())
     {
       commanderGetRPY(&eulerRollDesired, &eulerPitchDesired, &eulerYawDesired);
+    
       commanderGetRPYType(&rollType, &pitchType, &yawType);
 
       // 100HZ
@@ -312,6 +339,8 @@ static void stabilizerTask(void* param)
           vSpeed = vSpeed*vBiasAlpha + vSpeedASL*(1.f - vBiasAlpha);
           vSpeedAcc = vSpeed;
 
+
+
           // Reset Integral gain of PID controller if being charged
           if (!pmIsDischarging()){
               hoverPID.integ = 0.0;
@@ -336,7 +365,20 @@ static void stabilizerTask(void* param)
 
               // Reset hoverPID
               hoverPIDVal = pidUpdate(&hoverPID, asl, false);
+
+              //initialize the drifting
+              xPos = 0;
+              yPos = 0;
+              xSpeed = 0;
+              ySpeed = 0;
+              xIntegral = 0;
+              yIntegral = 0;
+
           }
+
+
+
+
 
           // In hover mode
           if (hover){
@@ -386,8 +428,14 @@ static void stabilizerTask(void* param)
 
 
         // Estimate speed from acc (drifts)
-        vSpeed += deadband(accWZ, vAccDeadband) * FUSION_UPDATE_DT;
-
+        vSpeed    += deadband(accWZ, vAccDeadband) * FUSION_UPDATE_DT;
+        xSpeed    += deadband(acc.x, vAccDeadband) * FUSION_UPDATE_DT; //added in here
+        ySpeed    += deadband(acc.y, vAccDeadband) * FUSION_UPDATE_DT;
+        xPos      += xSpeed * FUSION_UPDATE_DT;
+        yPos      += ySpeed * FUSION_UPDATE_DT;
+        xIntegral += xPos;
+        yIntegral += yPos;
+//Jeffrey DeLucca
 
         controllerCorrectAttitudePID(eulerRollActual, eulerPitchActual, eulerYawActual,
                                      eulerRollDesired, eulerPitchDesired, -eulerYawDesired,
