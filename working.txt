@@ -11,7 +11,7 @@ in 250hz refresh, you also refresh the drift variables.
 Second: Fix the bug in /crazyflie-pc-client/lib/cflib/drivers/crazyradio.py line 245, 246
 #removed third argument 0 for both read and write. similar to an issue in https://bitbucket.org/benallard/galileo/issue/77/typeerror-write-takes-at-most-4-arguments#comment-10892785
 
-
+Third: https://www.youtube.com/watch?v=cutgIMfHwyQ Take advantage of PARAM_GROUP behavior to easily
 
 and where the PID controller is
 modules\scr\stabilizer.c

@@ -119,8 +119,14 @@ PRIVATE float yIntegral              = 0.0;
 PRIVATE float xAccDeadband           = 0.03;  // X acceleration deadband
 PRIVATE float yAccDeadband           = 0.03;  // Y acceleration deadband
 
+PRIVATE float xDesired               = 0.0;
+PRIVATE float yDesired               = 0.0;
+PRIVATE float driftKp                = 7.0;
+PRIVATE float driftKi                = 0.18;
+PRIVATE float driftKd                = 0.0;
+
 // Hover & Baro Params
-PRIVATE float hoverKp                = 0.5;  // PID gain constants, used everytime we reinitialise the PID controller
+PRIVATE float hoverKp                = 1.0;  // PID gain constants, used everytime we reinitialise the PID controller
 PRIVATE float hoverKi                = 0.18;
 PRIVATE float hoverKd                = 0.0;
 PRIVATE float hoverChange            = 0;     // Change in target altitude
@@ -225,6 +231,14 @@ LOG_ADD(LOG_FLOAT, yIntegral, &yIntegral)
 //LOG_ADD(LOG_FLOAT, xAccDeadband, &xAccDeadband)
 //LOG_ADD(LOG_FLOAT, yAccDeadband, &yAccDeadband)
 LOG_GROUP_STOP(drift)
+
+PARAM_GROUP_START(driftpid)
+PARAM_ADD(PARAM_FLOAT, xDesired, &xDesired)
+PARAM_ADD(PARAM_FLOAT, yDesired, &yDesired)
+PARAM_ADD(PARAM_FLOAT, driftKp, &driftKp)
+PARAM_ADD(PARAM_FLOAT, driftKi, &driftKi)
+PARAM_ADD(PARAM_FLOAT, driftKd, &driftKd)
+PARAM_GROUP_STOP(driftpid)
 
 //// Params for hovering
 PARAM_GROUP_START(hover)
@@ -373,6 +387,8 @@ static void stabilizerTask(void* param)
               ySpeed = 0;
               xIntegral = 0;
               yIntegral = 0;
+              xDesired = 0;
+              yDesired = 0;
 
           }
 
@@ -436,6 +452,8 @@ static void stabilizerTask(void* param)
         xIntegral += xPos;
         yIntegral += yPos;
 //Jeffrey DeLucca
+        eulerRollDesired  += -1 * hoverKp * (xPos-xDesired);
+        eulerPitchDesired += hoverKp * (yPos-yDesired);
 
         controllerCorrectAttitudePID(eulerRollActual, eulerPitchActual, eulerYawActual,
                                      eulerRollDesired, eulerPitchDesired, -eulerYawDesired,
